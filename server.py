@@ -7,7 +7,8 @@ Transport: SSE (HTTP) — runs locally, ready for Azure deployment.
 Connect via: http://localhost:8000/sse
 """
 
-from mcp.server.fastmcp import FastMCP
+import os
+from fastmcp import FastMCP
 
 mcp = FastMCP("hello-world-server")
 
@@ -19,6 +20,10 @@ def hello_world() -> str:
 
 
 if __name__ == "__main__":
-    # SSE transport binds to 0.0.0.0:8000 by default.
-    # Use transport="stdio" if you need a local CLI-piped client instead.
-    mcp.run(transport="sse")
+    port = int(os.environ.get("PORT", 8000))
+    # Use SSE transport to match `client/demo.ipynb` which connects to `http://localhost:<port>/sse`.
+    # The installed MCP SDK's `FastMCP.run()` does not accept `host=...`, so we only pass `port`.
+    # For remote/container deployments, bind to all interfaces via env var.
+    os.environ.setdefault("FASTMCP_HOST", "0.0.0.0")
+    os.environ.setdefault("FASTMCP_PORT", str(port))
+    mcp.run(transport="http", host="0.0.0.0", port=port)
