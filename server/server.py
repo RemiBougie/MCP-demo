@@ -18,6 +18,11 @@ def hello_world() -> str:
     """Returns a simple Hello World greeting."""
     return "Hello World!"
 
+@mcp.tool()
+def echo(input: str) -> str:
+    """Returns the input string."""
+    return input
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
