@@ -21,10 +21,14 @@ Tables available:
 1. Optionally call get_database_overview or get_table_schema to understand the schema.
 2. Call execute_query with a valid T-SQL SELECT statement.
 3. execute_query returns ONLY column names and row count — the actual rows are sent directly to the UI and are NOT visible to you. Do not ask for the data again.
-4. Call render_component immediately after execute_query. render_component will fail if called before execute_query. Choose the best component:
+4. Call render_component immediately after execute_query. render_component will fail if called before execute_query. Choose the best component and shape your SQL accordingly:
    - Head: raw record preview (default when no chart makes sense).
-   - BarChart: comparisons across categories (e.g. total by account, count by type). Shape your query so the first column is the label and remaining columns are numeric.
-   - Timeline: trends over time (e.g. daily prices, monthly totals). Shape your query so the first column is a date/datetime and remaining columns are numeric values.
+   - Aggregate: summary stats (mean, median, stdev, z-score, count, etc.). Query must return ONE row; each column becomes a stat card. Auto-detects currency/percent/number format from column name.
+   - BarChart: category comparisons (e.g. total by account, count by type). First column = label, remaining = numeric series.
+   - Histogram: value distributions. Either raw numeric column(s) (one row per observation) or pre-bucketed (label col + frequency col).
+   - PieChart: part-to-whole breakdown. First column = label, second = numeric value. Keep to ≤10 slices.
+   - ScatterPlot: correlations. Two cols (x,y) for one series; three cols (x,label,y) for grouped series; or (x,y1,y2,...) for multiple y series.
+   - Timeline: trends over time. First column = date/datetime, remaining = numeric values as lines.
 5. Write a short explanation of what the query returned (row count, what columns represent, any key insight). Do not list individual row values since you cannot see them.
 
 ## When the user asks general questions (capabilities, what you can do, how to use you, etc.):
@@ -63,11 +67,15 @@ const renderComponentTool: AnthropicTool = {
     properties: {
       component: {
         type: 'string',
-        enum: ['Head', 'BarChart', 'Timeline'],
+        enum: ['Head', 'Aggregate', 'BarChart', 'Histogram', 'PieChart', 'ScatterPlot', 'Timeline'],
         description: [
-          'Head: shows the first 10 rows as a table. Best for raw record previews.',
-          'BarChart: renders a bar chart. First column must be the category label; remaining columns are numeric series (one bar group per series). Supports multiple bars per category. Orientation (vertical/horizontal) is chosen automatically.',
-          'Timeline: renders a line chart over time. First column must be a datetime; remaining columns are numeric values plotted as separate lines on the y-axis.',
+          'Head: first 10 rows as a table. Use for raw record previews.',
+          'Aggregate: one stat card per column, auto-formatted as currency/percent/number. Query must return a SINGLE row of summary statistics (e.g. AVG, SUM, STDEV, COUNT). Each column becomes its own card.',
+          'BarChart: bar chart for category comparisons. First column = category label; remaining columns = numeric series. Supports multiple bars per category. Auto-orients vertical/horizontal.',
+          'Histogram: distribution of a numeric variable. Either (a) one or more raw numeric columns where each row is an observation (bins computed automatically), or (b) two columns where the first is a pre-bucketed label and the second is the frequency count.',
+          'PieChart: part-to-whole relationships. First column = slice label; second column = numeric value. Best for ≤10 categories.',
+          'ScatterPlot: correlation between numeric variables. Supports three shapes: (a) two columns x,y for a single series; (b) three columns x,label,y where label is categorical — one series per unique label; (c) x,y1,y2,... for multiple y series sharing one x axis.',
+          'Timeline: line chart over time. First column = date/datetime; remaining columns = numeric values as separate lines.',
         ].join(' '),
       },
     },
