@@ -8,7 +8,6 @@ COPY server/requirements.txt .
 RUN pip install --no-cache-dir fastmcp pymssql python-dotenv uvicorn
 
 COPY server/server.py .
-COPY .env .
 
 ENV PORT=8000
 EXPOSE 8000

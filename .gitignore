@@ -1,0 +1,7 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+client-ts/node_modules/
+client-ts/.next/
+client-ts/.env*
