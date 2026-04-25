@@ -22,9 +22,6 @@ az containerapp update \
   --resource-group "$RG" \
   --image "$IMAGE" \
   --revision-suffix "$SUFFIX" \
-  --set-env-vars \
-    "NEXTAUTH_URL=https://sql-analytics.fourelementstechconsulting.com" \
-    "GOOGLE_CLIENT_ID=160900176224-h11a056elunbo0js6aulp3p16c87spg5.apps.googleusercontent.com" \
-    "MCP_SERVER_URL=https://mcp-sql-analytics.internal.mangoflower-6dbfeafb.centralus.azurecontainerapps.io/mcp"
+  --set-env-vars "NEXTAUTH_URL=https://sql-analytics.fourelementstechconsulting.com" "GOOGLE_CLIENT_ID=160900176224-h11a056elunbo0js6aulp3p16c87spg5.apps.googleusercontent.com" "MCP_SERVER_URL=https://mcp-sql-analytics.internal.mangoflower-6dbfeafb.centralus.azurecontainerapps.io/mcp"
 
 echo "==> Done. Revision: $APP--$SUFFIX"
