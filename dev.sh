@@ -2,13 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONTAINER_NAME="mcp-sql-analytics-local"
+CLIENT_PID=""
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
-if [[ ! -f "$SCRIPT_DIR/.venv/bin/python" ]]; then
-  echo "ERROR: .venv not found. Run: python -m venv .venv && .venv/bin/pip install -r server/requirements.txt"
-  exit 1
-fi
-
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
   echo "ERROR: .env not found. Copy .env.example and fill in your credentials."
   exit 1
@@ -20,23 +17,29 @@ if [[ ! -f "$SCRIPT_DIR/client-ts/.env.local" ]]; then
 fi
 
 # ── Cleanup on exit ───────────────────────────────────────────────────────────
-SERVER_PID=""
-CLIENT_PID=""
-
 cleanup() {
   echo ""
   echo "==> Shutting down..."
-  [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null && echo "    MCP server stopped."
+  docker stop "$CONTAINER_NAME" 2>/dev/null && echo "    MCP server container stopped."
   [[ -n "$CLIENT_PID" ]] && kill "$CLIENT_PID" 2>/dev/null && echo "    Client stopped."
   exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-# ── Start MCP server ──────────────────────────────────────────────────────────
-echo "==> Starting MCP server on http://localhost:8000 ..."
-"$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/server/server.py" 2>&1 | sed 's/^/[mcp]   /' &
-SERVER_PID=$!
+# ── Build and start MCP server container ─────────────────────────────────────
+echo "==> Building MCP server image..."
+docker build -f "$SCRIPT_DIR/server/Dockerfile" -t "$CONTAINER_NAME" "$SCRIPT_DIR" 2>&1 | sed 's/^/[mcp]   /'
+
+echo "==> Starting MCP server container on http://localhost:8000 ..."
+docker run --rm -d \
+  --name "$CONTAINER_NAME" \
+  --env-file "$SCRIPT_DIR/.env" \
+  -p 8000:8000 \
+  "$CONTAINER_NAME" > /dev/null
+
+# Stream container logs in the background
+docker logs -f "$CONTAINER_NAME" 2>&1 | sed 's/^/[mcp]   /' &
 
 # Give the server a moment to bind before starting the client
 sleep 2
@@ -47,11 +50,11 @@ cd "$SCRIPT_DIR/client-ts" && npm run dev 2>&1 | sed 's/^/[client] /' &
 CLIENT_PID=$!
 
 echo ""
-echo "  MCP server → http://localhost:8000"
-echo "  Client     → http://localhost:3000"
+echo "  MCP server → http://localhost:8000  (Docker)"
+echo "  Client     → http://localhost:3000  (npm run dev)"
 echo ""
 echo "  Press Ctrl+C to stop both."
 echo ""
 
-# ── Wait ─────────────────────────────────────────────────────────────────────
-wait "$SERVER_PID" "$CLIENT_PID"
+# ── Wait ──────────────────────────────────────────────────────────────────────
+wait "$CLIENT_PID"
