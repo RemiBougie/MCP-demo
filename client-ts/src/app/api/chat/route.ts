@@ -1,7 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { getServerSession } from 'next-auth';
 import { NextRequest } from 'next/server';
+import { authOptions } from '@/lib/auth';
 import { ColumnMeta, Row } from '@/lib/types';
 
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL ?? 'http://localhost:8000/mcp';
@@ -94,8 +96,21 @@ export async function POST(req: NextRequest) {
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
+  // Build auth headers for the MCP server
+  const mcpHeaders: Record<string, string> = {};
+  if (process.env.MCP_API_KEY) {
+    mcpHeaders['X-API-Key'] = process.env.MCP_API_KEY;
+  }
+  const session = await getServerSession(authOptions);
+  const accessToken = (session as (typeof session & { accessToken?: string }))?.accessToken;
+  if (accessToken) {
+    mcpHeaders['Authorization'] = `Bearer ${accessToken}`;
+  }
+
   const mcpClient = new Client({ name: 'mcp-next-client', version: '1.0.0' });
-  const transport = new StreamableHTTPClientTransport(new URL(MCP_SERVER_URL));
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_SERVER_URL), {
+    requestInit: { headers: mcpHeaders },
+  });
 
   try {
     await mcpClient.connect(transport);

@@ -18,9 +18,16 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+import httpx
 import pymssql
+import uvicorn
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
 logging.basicConfig(level=logging.ERROR)
 load_dotenv()  # no-op in Docker; works locally when run from project root
 
@@ -65,6 +72,59 @@ def _serialize(val: Any) -> Any:
     if isinstance(val, Decimal):
         return float(val)
     return val
+
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+
+ALLOWED_ORIGINS = [
+    "https://sql-analytics.fourelementstechconsulting.com",
+    "http://localhost:3000",
+]
+
+_MCP_API_KEY = os.getenv("MCP_API_KEY", "")
+
+
+async def _validate_google_token(token: str) -> bool:
+    """Return True if the token is a valid, active Google OAuth access token."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"access_token": token},
+            )
+            return resp.status_code == 200
+    except Exception:
+        return False
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """
+    Require at least one of:
+      1. A matching X-API-Key header (shared secret between client and server).
+      2. A valid Google OAuth access token in the Authorization: Bearer header.
+
+    Health-check / CORS preflight requests are passed through without auth.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        # Always allow CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # --- API key check ---
+        if _MCP_API_KEY and request.headers.get("X-API-Key") == _MCP_API_KEY:
+            return await call_next(request)
+
+        # --- Google token check ---
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.removeprefix("Bearer ").strip()
+            if token and await _validate_google_token(token):
+                return await call_next(request)
+
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
 
 # ---------------------------------------------------------------------------
@@ -196,4 +256,14 @@ def execute_query(sql: str) -> dict[str, Any]:
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    mcp.run(transport="http", host="0.0.0.0", port=port)
+
+    app = mcp.http_app()
+    app.add_middleware(AuthMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["*"],
+    )
+
+    uvicorn.run(app, host="0.0.0.0", port=port)
