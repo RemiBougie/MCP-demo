@@ -21,6 +21,7 @@ az containerapp update \
   --name "$APP" \
   --resource-group "$RG" \
   --image "$IMAGE" \
-  --revision-suffix "$SUFFIX"
+  --revision-suffix "$SUFFIX" \
+  --set-env-vars "NEXTAUTH_URL=https://sql-analytics.fourelementstechconsulting.com"
 
 echo "==> Done. Revision: $APP--$SUFFIX"
