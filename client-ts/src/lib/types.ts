@@ -1,6 +1,6 @@
 export type ColumnMeta = { name: string };
 export type Row = (string | number | boolean | null)[];
-export type UIComponent = 'Head' | 'BarChart' | 'Timeline';
+export type UIComponent = 'Head' | 'Aggregate' | 'BarChart' | 'Histogram' | 'PieChart' | 'ScatterPlot' | 'Timeline';
 
 export interface Visualization {
   component: UIComponent;
